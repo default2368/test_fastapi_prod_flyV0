@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from modules.test import esegui_test_completo
-from modules.mcp import test_mcp, get_mcp_info
+from modules.mcp import test_mcp, get_mcp_info, test_mcp_advanced
 
 app = FastAPI()
 
@@ -31,6 +31,34 @@ async def test_mcp_endpoint():
     
     return {
         "endpoint": "test-mcp",
+        "mcp_test": risultati
+    }
+
+@app.get("/mcp-info")
+async def mcp_info():
+    """Restituisce informazioni sul modulo MCP"""
+    info = get_mcp_info()
+    return {
+        "module_info": info
+    }
+
+@app.get("/test-mcp")
+async def test_mcp_endpoint():
+    """Testa l'integrazione MCP (versione base)"""
+    risultati = await test_mcp()
+    
+    return {
+        "endpoint": "test-mcp",
+        "mcp_test": risultati
+    }
+
+@app.get("/test-mcp-advanced")
+async def test_mcp_advanced_endpoint():
+    """Testa l'integrazione MCP (versione avanzata)"""
+    risultati = await test_mcp_advanced()
+    
+    return {
+        "endpoint": "test-mcp-advanced", 
         "mcp_test": risultati
     }
 
