@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 from modules.test import esegui_test_completo
+from modules.mcp import test_mcp, get_mcp_info
 
 app = FastAPI()
 
@@ -21,4 +22,22 @@ async def test_endpoint():
         "status": "success",
         "risultati": risultati,
         "message": "Controlla i log del server per vedere il decoratore in azione!"
+    }
+
+@app.get("/test-mcp")
+async def test_mcp_endpoint():
+    """Testa l'integrazione MCP"""
+    risultati = await test_mcp()
+    
+    return {
+        "endpoint": "test-mcp",
+        "mcp_test": risultati
+    }
+
+@app.get("/mcp-info")
+async def mcp_info():
+    """Restituisce informazioni sul modulo MCP"""
+    info = get_mcp_info()
+    return {
+        "module_info": info
     }
