@@ -1,9 +1,9 @@
-# fly.toml app configuration file generated for az-mcp-server on 2025-10-13T07:32:02Z
+# fly.toml app configuration file generated for test-mcp-prodv0 on 2025-10-14T08:16:06Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'az-mcp-server'
+app = 'test-mcp-prodv0'
 primary_region = 'fra'
 
 [build]
