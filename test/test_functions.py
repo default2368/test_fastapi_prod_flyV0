@@ -16,16 +16,20 @@ def saluta():
 def somma_semplice():
     return 5 + 3
 
-# Funzione di test per uso esterno
-def test_tutte_funzioni():
-    """Testa tutte le funzioni decorate e restituisce i risultati"""
+# Funzione principale di test
+def esegui_test_completo():
+    """Esegue tutte le funzioni decorate e restituisce risultati con log"""
     print("\n" + "="*50)
-    print("TEST DI TUTTE LE FUNZIONI DECORATE")
+    print("🧪 TEST COMPLETO FUNZIONI DECORATE")
     print("="*50)
     
     risultati = {
-        "saluta": saluta(),
-        "somma_semplice": somma_semplice()
+        "saluto": saluta(),
+        "somma": somma_semplice()
     }
+    
+    print("="*50)
+    print("✅ TEST COMPLETATO")
+    print("="*50)
     
     return risultati
