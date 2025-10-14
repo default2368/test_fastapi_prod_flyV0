@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from test.test_functions import esegui_test_completo
+from test import esegui_test_completo
 
 app = FastAPI()
 
