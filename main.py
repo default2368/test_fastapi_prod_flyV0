@@ -9,6 +9,24 @@ async def welcome():
 @app.get("/")
 async def root():
     return {"info": "Vai su /welcome per il messaggio di benvenuto"}
+
+# Decoratore per logging
+def logga_chiamata(func):
+    def wrapper():
+        print(f"▶️ INIZIO {func.__name__}")
+        risultato = func()
+        print(f"⏹️  FINE {func.__name__} → {risultato}")
+        return risultato
+    return wrapper
+
+# Funzioni con decoratore
+@logga_chiamata
+def saluta():
+    return "Ciao Mondo!"
+
+@logga_chiamata
+def somma_semplice():
+    return 5 + 3
     
 @app.get("/test-decoratore")
 async def test_decoratore():
