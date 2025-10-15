@@ -15,6 +15,30 @@ MCP_HEADERS = {
     "Accept": "application/json, text/event-stream"
 }
 
+def parse_sse_response(response_text):
+    """Parsa una risposta SSE (Server-Sent Events)"""
+    events = []
+    lines = response_text.strip().split('\n')
+    
+    current_event = {}
+    for line in lines:
+        if line.startswith('event:'):
+            current_event['event'] = line[6:].strip()
+        elif line.startswith('data:'):
+            data_content = line[5:].strip()
+            try:
+                current_event['data'] = json.loads(data_content)
+            except json.JSONDecodeError:
+                current_event['data'] = data_content
+        elif line == '' and current_event:
+            events.append(current_event)
+            current_event = {}
+    
+    if current_event:
+        events.append(current_event)
+    
+    return events
+
 @app.get("/welcome")
 async def welcome():
     return {"message": "Benvenuto nella mia app!"}
@@ -39,9 +63,7 @@ async def test_mcp_endpoint():
     """Testa la connessione al server MCP esterno"""
     try:
         # Test connessione base al MCP Server
-        print(f"🔍 Testing MCP server: {MCP_SERVER_URL}")
         base_response = requests.get(MCP_SERVER_URL, timeout=10)
-        print(f"✅ Base connection: {base_response.status_code}")
         
         # Prova chiamata MCP initialize con headers corretti
         mcp_payload = {
@@ -58,7 +80,6 @@ async def test_mcp_endpoint():
             }
         }
         
-        print(f"📤 Sending MCP request to: {MCP_SERVER_URL}/mcp")
         mcp_response = requests.post(
             f"{MCP_SERVER_URL}/mcp",
             json=mcp_payload,
@@ -66,35 +87,59 @@ async def test_mcp_endpoint():
             timeout=10
         )
         
-        print(f"📥 MCP Response status: {mcp_response.status_code}")
-        print(f"📥 MCP Response headers: {dict(mcp_response.headers)}")
-        print(f"📥 MCP Response content (first 500 chars): {mcp_response.text[:500]}")
-        
-        # Prova a parsare la risposta
-        try:
-            mcp_data = mcp_response.json()
-            print("✅ Successfully parsed JSON response")
-            
-            return {
-                "status": "success",
-                "mcp_server_status": "online",
-                "mcp_response": mcp_data,
-                "message": "MCP Server raggiungibile e funzionante!"
-            }
-        except json.JSONDecodeError as json_error:
-            print(f"❌ JSON parse error: {json_error}")
-            # Restituisci la risposta raw per debug
+        if mcp_response.status_code == 200:
+            # Il server MCP usa SSE, parsiamo la risposta
+            if mcp_response.headers.get('content-type') == 'text/event-stream':
+                sse_events = parse_sse_response(mcp_response.text)
+                
+                # Cerca il risultato initialize
+                initialize_result = None
+                for event in sse_events:
+                    if event.get('data', {}).get('id') == 1:  # ID della nostra richiesta
+                        initialize_result = event.get('data', {})
+                        break
+                
+                if initialize_result:
+                    return {
+                        "status": "success",
+                        "mcp_server_status": "online", 
+                        "protocol": "SSE (Server-Sent Events)",
+                        "initialize_result": initialize_result,
+                        "all_events": sse_events,
+                        "message": "MCP Server funzionante con protocollo SSE!"
+                    }
+                else:
+                    return {
+                        "status": "partial_success",
+                        "mcp_server_status": "online",
+                        "protocol": "SSE (Server-Sent Events)", 
+                        "sse_events": sse_events,
+                        "message": "MCP Server online ma risultato initialize non trovato"
+                    }
+            else:
+                # Prova come JSON normale
+                try:
+                    mcp_data = mcp_response.json()
+                    return {
+                        "status": "success",
+                        "mcp_server_status": "online",
+                        "mcp_response": mcp_data,
+                        "message": "MCP Server raggiungibile e funzionante!"
+                    }
+                except json.JSONDecodeError:
+                    return {
+                        "status": "partial_success",
+                        "mcp_server_status": "online", 
+                        "raw_response": mcp_response.text,
+                        "content_type": mcp_response.headers.get('content-type'),
+                        "message": "MCP Server online ma formato risposta non riconosciuto"
+                    }
+        else:
             return {
                 "status": "partial_success",
                 "mcp_server_status": "online",
                 "mcp_response_status": mcp_response.status_code,
-                "message": f"MCP Server online ma risposta non JSON",
-                "debug_info": {
-                    "response_content": mcp_response.text[:1000],  # Primi 1000 caratteri
-                    "content_type": mcp_response.headers.get('content-type', 'unknown'),
-                    "response_length": len(mcp_response.text),
-                    "json_error": str(json_error)
-                }
+                "message": f"MCP Server online ma errore HTTP: {mcp_response.text}"
             }
             
     except requests.exceptions.Timeout:
@@ -166,7 +211,7 @@ async def test_v0():
 
 @app.get("/test-v1")
 async def test_v1():
-    """TEST V1: Testa il server MCP esterno con debug"""
+    """TEST V1: Testa il server MCP esterno"""
     print("🧪 TEST V1 - SERVER MCP ESTERNO")
     
     test_results = {}
@@ -185,7 +230,7 @@ async def test_v1():
             "error": str(e)
         }
     
-    # Test 2: Protocollo MCP initialize con debug
+    # Test 2: Protocollo MCP initialize
     try:
         mcp_payload = {
             "jsonrpc": "2.0",
@@ -205,26 +250,27 @@ async def test_v1():
             timeout=10
         )
         
-        # Debug della risposta
-        content_type = mcp_response.headers.get('content-type', 'unknown')
-        response_preview = mcp_response.text[:200] if mcp_response.text else "empty"
-        
-        test_results["mcp_protocol"] = {
-            "status": "success" if mcp_response.status_code == 200 else "partial",
-            "status_code": mcp_response.status_code,
-            "content_type": content_type,
-            "response_preview": response_preview,
-            "response_length": len(mcp_response.text)
-        }
-        
-        # Prova a parsare JSON se possibile
-        if 'application/json' in content_type:
-            try:
-                json_data = mcp_response.json()
-                test_results["mcp_protocol"]["parsed_json"] = json_data
-            except:
-                test_results["mcp_protocol"]["json_parse_error"] = "Could not parse as JSON"
-                
+        if mcp_response.status_code == 200:
+            # Parsing SSE
+            sse_events = parse_sse_response(mcp_response.text)
+            initialize_found = any(event.get('data', {}).get('id') == 1 for event in sse_events)
+            
+            test_results["mcp_protocol"] = {
+                "status": "success",
+                "status_code": mcp_response.status_code,
+                "protocol": "SSE",
+                "events_count": len(sse_events),
+                "initialize_found": initialize_found,
+                "server_info": next((event.get('data', {}).get('result', {}).get('serverInfo') 
+                                  for event in sse_events 
+                                  if event.get('data', {}).get('result', {}).get('serverInfo')), None)
+            }
+        else:
+            test_results["mcp_protocol"] = {
+                "status": "partial",
+                "status_code": mcp_response.status_code,
+                "response": mcp_response.text[:500]
+            }
     except Exception as e:
         test_results["mcp_protocol"] = {
             "status": "error",
@@ -256,7 +302,7 @@ async def overall_status():
         "timestamp": datetime.now().isoformat(),
         "versions": {
             "v0": "FastAPI App - Metodi Locali",
-            "v1": "MCP Server - Protocollo AI"
+            "v1": "MCP Server - Protocollo SSE"
         },
         "urls": {
             "v0_fastapi": "https://test-mcp-prodv0.fly.dev",
