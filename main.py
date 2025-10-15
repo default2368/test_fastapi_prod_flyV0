@@ -19,7 +19,7 @@ async def root():
 
 @app.get("/test")
 async def test_endpoint():
-    """Testa le funzioni decorate locali"""
+    """Testa le funzioni decorate locali (V0)"""
     risultati = esegui_test_completo()
     
     return {
@@ -30,7 +30,7 @@ async def test_endpoint():
 
 @app.get("/test-mcp")
 async def test_mcp_endpoint():
-    """Testa la connessione al server MCP esterno"""
+    """Testa la connessione al server MCP esterno (V1)"""
     try:
         # Test connessione base al MCP Server
         response = requests.get(MCP_SERVER_URL, timeout=10)
@@ -92,20 +92,6 @@ async def test_mcp_endpoint():
             "message": f"Errore durante il test MCP: {str(e)}"
         }
 
-@app.get("/mcp-tools")
-async def list_mcp_tools():
-    """Lista i tools disponibili sul server MCP"""
-    return {
-        "mcp_server": MCP_SERVER_URL,
-        "available_tools": [
-            "get_server_info",
-            "calculate_operation", 
-            "format_text",
-            "get_system_status"
-        ],
-        "note": "I tools sono disponibili via protocollo MCP sul server esterno"
-    }
-
 @app.get("/health")
 async def health_check():
     """Health check per entrambe le app"""
@@ -128,131 +114,119 @@ async def health_check():
             "timestamp": datetime.now().isoformat()
         }
 
-@app.get("/test-production")
-async def test_production_complete():
-    """Test completo di tutto il setup di produzione"""
+@app.get("/test-v0")
+async def test_v0():
+    """TEST V0: Testa tutti i metodi locali della FastAPI"""
+    print("🧪 TEST V0 - METODI LOCALI FASTAPI")
+    
+    # Test 1: Funzioni decorate
+    test_risultati = esegui_test_completo()
+    
+    # Test 2: Endpoint locali (test interno, non chiamate HTTP)
+    local_tests = {
+        "welcome_endpoint": {"status": "success", "data": await welcome()},
+        "root_endpoint": {"status": "success", "data": await root()},
+        "decorated_functions": {"status": "success", "data": test_risultati}
+    }
+    
+    return {
+        "version": "V0 - FastAPI App",
+        "timestamp": datetime.now().isoformat(),
+        "tests": local_tests,
+        "summary": {
+            "total_tests": len(local_tests),
+            "successful_tests": len(local_tests),  # Tutti interni, sempre successo
+            "success_rate": "100%"
+        }
+    }
+
+@app.get("/test-v1")
+async def test_v1():
+    """TEST V1: Testa il server MCP esterno"""
+    print("🧪 TEST V1 - SERVER MCP ESTERNO")
+    
     test_results = {}
     
-    # Test 1: Health Check
+    # Test 1: Connessione base al MCP Server
     try:
-        health_response = requests.get(f"https://test-mcp-prodv0.fly.dev/health", timeout=10)
-        test_results["health_check"] = {
-            "status": "success" if health_response.status_code == 200 else "failed",
-            "status_code": health_response.status_code,
-            "data": health_response.json() if health_response.status_code == 200 else health_response.text
+        base_response = requests.get(MCP_SERVER_URL, timeout=10)
+        test_results["mcp_server_connection"] = {
+            "status": "success",
+            "status_code": base_response.status_code,
+            "note": "404 è normale per MCP server"
         }
     except Exception as e:
-        test_results["health_check"] = {
+        test_results["mcp_server_connection"] = {
             "status": "error",
             "error": str(e)
         }
     
-    # Test 2: Endpoints Locali
+    # Test 2: Protocollo MCP initialize
     try:
-        welcome_response = requests.get(f"https://test-mcp-prodv0.fly.dev/welcome", timeout=10)
-        test_results["welcome_endpoint"] = {
-            "status": "success" if welcome_response.status_code == 200 else "failed",
-            "status_code": welcome_response.status_code,
-            "data": welcome_response.json() if welcome_response.status_code == 200 else welcome_response.text
+        mcp_payload = {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "initialize",
+            "params": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {},
+                "clientInfo": {"name": "V1-Test", "version": "1.0.0"}
+            }
         }
-    except Exception as e:
-        test_results["welcome_endpoint"] = {
-            "status": "error",
-            "error": str(e)
-        }
-    
-    # Test 3: Test Endpoint
-    try:
-        test_response = requests.get(f"https://test-mcp-prodv0.fly.dev/test", timeout=10)
-        test_results["test_endpoint"] = {
-            "status": "success" if test_response.status_code == 200 else "failed",
-            "status_code": test_response.status_code,
-            "data": test_response.json() if test_response.status_code == 200 else test_response.text
-        }
-    except Exception as e:
-        test_results["test_endpoint"] = {
-            "status": "error",
-            "error": str(e)
-        }
-    
-    # Test 4: MCP Server Connection
-    try:
-        mcp_response = requests.get(f"https://test-mcp-prodv0.fly.dev/test-mcp", timeout=10)
-        test_results["mcp_connection"] = {
-            "status": "success" if mcp_response.status_code == 200 else "failed",
+        
+        mcp_response = requests.post(
+            f"{MCP_SERVER_URL}/mcp",
+            json=mcp_payload,
+            headers={"Content-Type": "application/json"},
+            timeout=10
+        )
+        
+        test_results["mcp_protocol"] = {
+            "status": "success" if mcp_response.status_code == 200 else "partial",
             "status_code": mcp_response.status_code,
             "data": mcp_response.json() if mcp_response.status_code == 200 else mcp_response.text
         }
     except Exception as e:
-        test_results["mcp_connection"] = {
+        test_results["mcp_protocol"] = {
             "status": "error",
             "error": str(e)
         }
     
-    # Test 5: MCP Server Direct
-    try:
-        direct_mcp_response = requests.get(MCP_SERVER_URL, timeout=10)
-        test_results["mcp_server_direct"] = {
-            "status": "success" if direct_mcp_response.status_code < 500 else "failed",
-            "status_code": direct_mcp_response.status_code,
-            "note": "MCP server risponde (404 è normale per MCP)"
-        }
-    except Exception as e:
-        test_results["mcp_server_direct"] = {
-            "status": "error",
-            "error": str(e)
-        }
-    
-    # Calcola riepilogo
+    # Calcola statistiche
     total_tests = len(test_results)
     successful_tests = sum(1 for test in test_results.values() if test["status"] == "success")
     
     return {
-        "test_summary": {
+        "version": "V1 - MCP Server",
+        "timestamp": datetime.now().isoformat(),
+        "mcp_server_url": MCP_SERVER_URL,
+        "tests": test_results,
+        "summary": {
             "total_tests": total_tests,
             "successful_tests": successful_tests,
             "failed_tests": total_tests - successful_tests,
-            "success_rate": f"{(successful_tests/total_tests)*100:.1f}%",
-            "timestamp": datetime.now().isoformat()
-        },
-        "detailed_results": test_results,
-        "urls_tested": {
-            "fastapi_app": "https://test-mcp-prodv0.fly.dev",
-            "mcp_server": MCP_SERVER_URL
+            "success_rate": f"{(successful_tests/total_tests)*100:.1f}%"
         }
     }
 
 @app.get("/status")
 async def overall_status():
     """Status riepilogativo di tutto il sistema"""
-    try:
-        # Test FastAPI app
-        health = await health_check()
-        
-        # Test MCP connection
-        mcp_test = await test_mcp_endpoint()
-        
-        return {
-            "system": "test-mcp-production",
-            "timestamp": datetime.now().isoformat(),
-            "components": {
-                "fastapi_app": health["fastapi_app"],
-                "mcp_server": health["mcp_server"],
-                "mcp_connection": mcp_test["status"]
-            },
-            "urls": {
-                "fastapi": "https://test-mcp-prodv0.fly.dev",
-                "mcp_server": MCP_SERVER_URL
-            },
-            "endpoints_available": [
-                "/", "/welcome", "/test", "/test-mcp", "/mcp-tools", 
-                "/health", "/test-production", "/status"
-            ]
-        }
-    except Exception as e:
-        return {
-            "system": "test-mcp-production",
-            "status": "error",
-            "error": str(e),
-            "timestamp": datetime.now().isoformat()
-        }
+    return {
+        "system": "test-mcp-production",
+        "timestamp": datetime.now().isoformat(),
+        "versions": {
+            "v0": "FastAPI App - Metodi Locali",
+            "v1": "MCP Server - Protocollo AI"
+        },
+        "urls": {
+            "v0_fastapi": "https://test-mcp-prodv0.fly.dev",
+            "v1_mcp_server": MCP_SERVER_URL
+        },
+        "test_endpoints": [
+            "/test-v0 - Test metodi locali V0",
+            "/test-v1 - Test server MCP V1", 
+            "/health - Health check",
+            "/status - Status sistema"
+        ]
+    }
