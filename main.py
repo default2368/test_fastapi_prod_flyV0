@@ -39,7 +39,9 @@ async def test_mcp_endpoint():
     """Testa la connessione al server MCP esterno"""
     try:
         # Test connessione base al MCP Server
-        response = requests.get(MCP_SERVER_URL, timeout=10)
+        print(f"🔍 Testing MCP server: {MCP_SERVER_URL}")
+        base_response = requests.get(MCP_SERVER_URL, timeout=10)
+        print(f"✅ Base connection: {base_response.status_code}")
         
         # Prova chiamata MCP initialize con headers corretti
         mcp_payload = {
@@ -56,6 +58,7 @@ async def test_mcp_endpoint():
             }
         }
         
+        print(f"📤 Sending MCP request to: {MCP_SERVER_URL}/mcp")
         mcp_response = requests.post(
             f"{MCP_SERVER_URL}/mcp",
             json=mcp_payload,
@@ -63,23 +66,34 @@ async def test_mcp_endpoint():
             timeout=10
         )
         
-        if mcp_response.status_code == 200:
+        print(f"📥 MCP Response status: {mcp_response.status_code}")
+        print(f"📥 MCP Response headers: {dict(mcp_response.headers)}")
+        print(f"📥 MCP Response content (first 500 chars): {mcp_response.text[:500]}")
+        
+        # Prova a parsare la risposta
+        try:
             mcp_data = mcp_response.json()
+            print("✅ Successfully parsed JSON response")
+            
             return {
                 "status": "success",
                 "mcp_server_status": "online",
                 "mcp_response": mcp_data,
                 "message": "MCP Server raggiungibile e funzionante!"
             }
-        else:
+        except json.JSONDecodeError as json_error:
+            print(f"❌ JSON parse error: {json_error}")
+            # Restituisci la risposta raw per debug
             return {
                 "status": "partial_success",
                 "mcp_server_status": "online",
                 "mcp_response_status": mcp_response.status_code,
-                "message": f"MCP Server online ma errore protocollo: {mcp_response.text}",
+                "message": f"MCP Server online ma risposta non JSON",
                 "debug_info": {
-                    "headers_sent": MCP_HEADERS,
-                    "response_headers": dict(mcp_response.headers)
+                    "response_content": mcp_response.text[:1000],  # Primi 1000 caratteri
+                    "content_type": mcp_response.headers.get('content-type', 'unknown'),
+                    "response_length": len(mcp_response.text),
+                    "json_error": str(json_error)
                 }
             }
             
@@ -152,7 +166,7 @@ async def test_v0():
 
 @app.get("/test-v1")
 async def test_v1():
-    """TEST V1: Testa il server MCP esterno con headers corretti"""
+    """TEST V1: Testa il server MCP esterno con debug"""
     print("🧪 TEST V1 - SERVER MCP ESTERNO")
     
     test_results = {}
@@ -171,7 +185,7 @@ async def test_v1():
             "error": str(e)
         }
     
-    # Test 2: Protocollo MCP initialize con headers corretti
+    # Test 2: Protocollo MCP initialize con debug
     try:
         mcp_payload = {
             "jsonrpc": "2.0",
@@ -191,22 +205,26 @@ async def test_v1():
             timeout=10
         )
         
-        if mcp_response.status_code == 200:
-            test_results["mcp_protocol"] = {
-                "status": "success",
-                "status_code": mcp_response.status_code,
-                "data": mcp_response.json()
-            }
-        else:
-            test_results["mcp_protocol"] = {
-                "status": "partial",
-                "status_code": mcp_response.status_code,
-                "data": mcp_response.text,
-                "debug": {
-                    "headers_used": MCP_HEADERS,
-                    "response_headers": dict(mcp_response.headers)
-                }
-            }
+        # Debug della risposta
+        content_type = mcp_response.headers.get('content-type', 'unknown')
+        response_preview = mcp_response.text[:200] if mcp_response.text else "empty"
+        
+        test_results["mcp_protocol"] = {
+            "status": "success" if mcp_response.status_code == 200 else "partial",
+            "status_code": mcp_response.status_code,
+            "content_type": content_type,
+            "response_preview": response_preview,
+            "response_length": len(mcp_response.text)
+        }
+        
+        # Prova a parsare JSON se possibile
+        if 'application/json' in content_type:
+            try:
+                json_data = mcp_response.json()
+                test_results["mcp_protocol"]["parsed_json"] = json_data
+            except:
+                test_results["mcp_protocol"]["json_parse_error"] = "Could not parse as JSON"
+                
     except Exception as e:
         test_results["mcp_protocol"] = {
             "status": "error",
