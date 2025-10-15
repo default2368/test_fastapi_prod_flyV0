@@ -9,6 +9,12 @@ app = FastAPI()
 # URL del MCP Server
 MCP_SERVER_URL = "https://test-mcp-prodv1.fly.dev"
 
+# Headers corretti per MCP
+MCP_HEADERS = {
+    "Content-Type": "application/json",
+    "Accept": "application/json, text/event-stream"
+}
+
 @app.get("/welcome")
 async def welcome():
     return {"message": "Benvenuto nella mia app!"}
@@ -19,7 +25,7 @@ async def root():
 
 @app.get("/test")
 async def test_endpoint():
-    """Testa le funzioni decorate locali (V0)"""
+    """Testa le funzioni decorate locali"""
     risultati = esegui_test_completo()
     
     return {
@@ -30,12 +36,12 @@ async def test_endpoint():
 
 @app.get("/test-mcp")
 async def test_mcp_endpoint():
-    """Testa la connessione al server MCP esterno (V1)"""
+    """Testa la connessione al server MCP esterno"""
     try:
         # Test connessione base al MCP Server
         response = requests.get(MCP_SERVER_URL, timeout=10)
         
-        # Prova chiamata MCP initialize
+        # Prova chiamata MCP initialize con headers corretti
         mcp_payload = {
             "jsonrpc": "2.0",
             "id": 1,
@@ -53,7 +59,7 @@ async def test_mcp_endpoint():
         mcp_response = requests.post(
             f"{MCP_SERVER_URL}/mcp",
             json=mcp_payload,
-            headers={"Content-Type": "application/json"},
+            headers=MCP_HEADERS,
             timeout=10
         )
         
@@ -70,7 +76,11 @@ async def test_mcp_endpoint():
                 "status": "partial_success",
                 "mcp_server_status": "online",
                 "mcp_response_status": mcp_response.status_code,
-                "message": f"MCP Server online ma errore protocollo: {mcp_response.text}"
+                "message": f"MCP Server online ma errore protocollo: {mcp_response.text}",
+                "debug_info": {
+                    "headers_sent": MCP_HEADERS,
+                    "response_headers": dict(mcp_response.headers)
+                }
             }
             
     except requests.exceptions.Timeout:
@@ -135,14 +145,14 @@ async def test_v0():
         "tests": local_tests,
         "summary": {
             "total_tests": len(local_tests),
-            "successful_tests": len(local_tests),  # Tutti interni, sempre successo
+            "successful_tests": len(local_tests),
             "success_rate": "100%"
         }
     }
 
 @app.get("/test-v1")
 async def test_v1():
-    """TEST V1: Testa il server MCP esterno"""
+    """TEST V1: Testa il server MCP esterno con headers corretti"""
     print("🧪 TEST V1 - SERVER MCP ESTERNO")
     
     test_results = {}
@@ -161,7 +171,7 @@ async def test_v1():
             "error": str(e)
         }
     
-    # Test 2: Protocollo MCP initialize
+    # Test 2: Protocollo MCP initialize con headers corretti
     try:
         mcp_payload = {
             "jsonrpc": "2.0",
@@ -177,15 +187,26 @@ async def test_v1():
         mcp_response = requests.post(
             f"{MCP_SERVER_URL}/mcp",
             json=mcp_payload,
-            headers={"Content-Type": "application/json"},
+            headers=MCP_HEADERS,
             timeout=10
         )
         
-        test_results["mcp_protocol"] = {
-            "status": "success" if mcp_response.status_code == 200 else "partial",
-            "status_code": mcp_response.status_code,
-            "data": mcp_response.json() if mcp_response.status_code == 200 else mcp_response.text
-        }
+        if mcp_response.status_code == 200:
+            test_results["mcp_protocol"] = {
+                "status": "success",
+                "status_code": mcp_response.status_code,
+                "data": mcp_response.json()
+            }
+        else:
+            test_results["mcp_protocol"] = {
+                "status": "partial",
+                "status_code": mcp_response.status_code,
+                "data": mcp_response.text,
+                "debug": {
+                    "headers_used": MCP_HEADERS,
+                    "response_headers": dict(mcp_response.headers)
+                }
+            }
     except Exception as e:
         test_results["mcp_protocol"] = {
             "status": "error",
