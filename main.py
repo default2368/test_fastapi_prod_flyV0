@@ -24,7 +24,7 @@ async def test_endpoint():
         "message": "Controlla i log del server per vedere il decoratore in azione!"
     }
 
-"""
+f"""
 @app.get("/test-mcp")
 async def test_mcp_endpoint():
     """Testa l'integrazione MCP (versione base sicura)"""
