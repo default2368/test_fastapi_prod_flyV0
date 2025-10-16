@@ -6,10 +6,6 @@ import json
 from datetime import datetime
 from modules.test import esegui_test_completo
 
-# Import NiceGUI
-from nicegui import ui
-from ui.app import create_ui
-
 app = FastAPI(title="MCP System API")
 
 # Configura CORS
@@ -334,13 +330,8 @@ async def overall_status():
         ]
     }
 
-# ===== INTEGRAZIONE NICEGUI =====
 
-# Crea l'interfaccia NiceGUI
-create_ui()
 
-# Monta NiceGUI su FastAPI
-ui.run_with(app, mount_path="/ui")
 
 if __name__ == "__main__":
     import uvicorn
