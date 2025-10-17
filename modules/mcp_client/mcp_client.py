@@ -1,3 +1,4 @@
+python
 import requests
 import json
 from datetime import datetime
@@ -9,6 +10,7 @@ class MCPClient:
             "Content-Type": "application/json",
             "Accept": "application/json, text/event-stream"
         }
+        self.session_id = None  # ← AGGIUNGI QUESTA RIGA
     
     def parse_sse_response(self, response_text: str) -> list:
         """Parsa una risposta SSE (Server-Sent Events)"""
@@ -34,23 +36,8 @@ class MCPClient:
         
         return events
     
-    async def test_connection(self) -> dict:
-        """Testa la connessione base al MCP Server"""
-        try:
-            response = requests.get(self.mcp_url, timeout=10)
-            return {
-                "status": "success",
-                "status_code": response.status_code,
-                "note": "404 è normale per MCP server"
-            }
-        except Exception as e:
-            return {
-                "status": "error",
-                "error": str(e)
-            }
-    
     async def initialize_mcp(self) -> dict:
-        """Inizializza la connessione MCP"""
+        """Inizializza la connessione MCP e memorizza session ID"""
         try:
             payload = {
                 "jsonrpc": "2.0",
@@ -76,11 +63,15 @@ class MCPClient:
             if response.status_code == 200:
                 sse_events = self.parse_sse_response(response.text)
                 
-                # Cerca il risultato initialize
+                # Cerca il risultato initialize e session ID
                 initialize_result = None
                 for event in sse_events:
-                    if event.get('data', {}).get('id') == 1:
-                        initialize_result = event.get('data', {})
+                    event_data = event.get('data', {})
+                    if event_data.get('id') == 1:
+                        initialize_result = event_data
+                        # Estrai session ID dalla risposta
+                        if 'result' in event_data:
+                            self.session_id = event_data['result'].get('sessionId')
                         break
                 
                 if initialize_result:
@@ -88,6 +79,7 @@ class MCPClient:
                         "status": "success",
                         "protocol": "SSE",
                         "initialize_result": initialize_result,
+                        "session_id": self.session_id,
                         "all_events": sse_events
                     }
                 else:
@@ -111,13 +103,17 @@ class MCPClient:
             }
     
     async def list_tools(self) -> dict:
-        """Lista i tools disponibili sul server MCP"""
+        """Lista i tools disponibili sul server MCP con session ID"""
         try:
             payload = {
                 "jsonrpc": "2.0",
                 "id": 2,
                 "method": "tools/list"
             }
+            
+            # AGGIUNGI SESSION ID SE PRESENTE
+            if self.session_id:
+                payload["params"] = {"sessionId": self.session_id}
             
             response = requests.post(
                 f"{self.mcp_url}/mcp",
@@ -152,6 +148,8 @@ class MCPClient:
                 "status": "error",
                 "error": str(e)
             }
+
+    # ... resto del codice invariato ...
     
     async def full_test(self) -> dict:
         """Test completo del server MCP"""
