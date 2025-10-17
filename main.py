@@ -22,7 +22,7 @@ app.add_middleware(
 )
 
 # Include routes organizzate
-app.include_router(system.router)
+app.include_router(system_info.router)  # CORRETTO
 app.include_router(mcp.router)
 app.include_router(claude.router)  # Nuova route Claude
 
