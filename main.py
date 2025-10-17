@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
 
 # Import routes organizzate
-from modules.routes import mcp, system_info
+from modules.routes import mcp, system_info, claude
 from modules.test import esegui_test_completo
 
 app = FastAPI(
