@@ -10,7 +10,7 @@ router = APIRouter(prefix="/test", tags=["Claude Test"])
 async def test_claude_configuration():
     """Testa il server MCP come farebbe Claude Desktop"""
     
-    MCP_URL = "https://test-mcp-prodv1.fly.dev/mcp"
+    MCP_URL = "https://test-mcp-prodv1.fly.dev/sse"
     
     test_results = {
         "timestamp": datetime.now().isoformat(),
