@@ -22,9 +22,9 @@ app.add_middleware(
 )
 
 # Include routes organizzate
-app.include_router(system_info.router)  # CORRETTO
+app.include_router(system_info.router)
 app.include_router(mcp.router)
-app.include_router(claude.router)  # Nuova route Claude
+app.include_router(claude.router)
 
 # ===== ENDPOINTS PRINCIPALI SEMPLIFICATI =====
 
@@ -98,7 +98,7 @@ async def docs_overview():
 @app.get("/health")
 async def health_legacy():
     """Health check legacy - usa /system/health per la versione nuova"""
-    from modules.routes.system import health_check
+    from modules.routes.system_info import health_check  # ← CORRETTO
     return await health_check()
 
 @app.get("/test-mcp")
@@ -110,19 +110,19 @@ async def test_mcp_legacy():
 @app.get("/test-v0")
 async def test_v0_legacy():
     """Test V0 legacy - usa /system/test-v0 per la versione nuova"""
-    from modules.routes.system import test_v0
+    from modules.routes.system_info import test_v0  # ← CORRETTO
     return await test_v0()
 
 @app.get("/test-v1") 
 async def test_v1_legacy():
     """Test V1 legacy - usa /system/test-v1 per la versione nuova"""
-    from modules.routes.system import test_v1
+    from modules.routes.system_info import test_v1  # ← CORRETTO
     return await test_v1()
 
 @app.get("/status")
 async def status_legacy():
     """Status legacy - usa /system/status per la versione nuova"""
-    from modules.routes.system import overall_status
+    from modules.routes.system_info import overall_status  # ← CORRETTO
     return await overall_status()
 
 if __name__ == "__main__":
