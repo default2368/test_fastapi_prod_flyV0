@@ -60,13 +60,16 @@ async def test_claude_configuration():
                     
                     # Extract server info
                     server_info = data.get('result', {}).get('serverInfo', {})
+                    # Try to extract sessionId if present (needed for subsequent calls)
+                    session_id = data.get('result', {}).get('sessionId')
                     break
             
             test_results["tests"]["initialize"] = {
                 "status": "success",
                 "status_code": response.status_code,
                 "server_info": server_info,
-                "initialize_data": initialize_data
+                "initialize_data": initialize_data,
+                "session_id": session_id if 'session_id' in locals() else None
             }
         else:
             test_results["tests"]["initialize"] = {
@@ -83,6 +86,9 @@ async def test_claude_configuration():
             "id": 2,
             "method": "tools/list"
         }
+        # If we extracted a session id from initialize, include it in params
+        if 'session_id' in locals() and session_id:
+            tools_payload["params"] = {"sessionId": session_id}
         
         tools_response = requests.post(MCP_URL, json=tools_payload, headers=headers, timeout=10)
         
